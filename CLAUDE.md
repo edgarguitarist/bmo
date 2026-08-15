@@ -4,59 +4,39 @@ Este archivo proporciona orientación a Claude Code (claude.ai/code) al trabajar
 
 ## Resumen del proyecto
 
-**BMO** es una app web que dibuja al personaje BMO (de *Hora de Aventura*) íntegramente con JSX + clases de Tailwind, sin imágenes: cada parte del cuerpo (cara, pecho, botones, laterales) es un componente React compuesto. No hay lógica de negocio ni estado; es una pieza puramente visual.
+**BMO** es una app web que dibuja al personaje BMO (de *Hora de Aventura*) íntegramente con JSX + clases de Tailwind, sin imágenes: cada parte del cuerpo (cara, pecho, botones, laterales) es un componente React compuesto. No hay lógica de negocio, estado ni props; es una pieza puramente visual.
 
-Stack: **React 18 + Vite 4 + Tailwind CSS 3** (JavaScript, no TypeScript). ESLint para linting.
+Stack: **React 18 + Vite 4 + Tailwind CSS 3** (JavaScript, no TypeScript). ESLint para linting. No hay suite de tests ni script `test`.
 
 ## Comandos principales
 
 ```bash
 npm install        # Instalar dependencias
-npm run dev        # Servidor de desarrollo con HMR (Vite)
+npm run dev        # Servidor de desarrollo con HMR (Vite, http://localhost:5173)
 npm run build      # Build de producción -> dist/
 npm run preview    # Previsualizar el build de producción
-npm run lint       # ESLint (js/jsx), falla con cualquier warning (--max-warnings 0)
+npm run lint       # ESLint sobre js/jsx; falla con cualquier warning (--max-warnings 0)
 ```
+
+Sobre el lint: la regla `react-refresh/only-export-components` está como `warn`, pero con `--max-warnings 0` cualquier warning rompe el comando. Cada archivo `.jsx` debe exportar solo componentes (export default de una función).
 
 ## Arquitectura
 
 El árbol de render se arma por composición de componentes, cada uno una parte del cuerpo de BMO:
 
-- `src/main.jsx` — punto de entrada; monta `<App>` en `#root` e importa `src/index.css` (directivas de Tailwind).
+- `src/main.jsx` — punto de entrada; monta `<App>` en `#root` e importa `src/index.css`.
 - `src/App.jsx` — solo renderiza `<Structure>`.
-- `src/bmo/structure.jsx` — layout raíz: fila flex de tres columnas `<LeftSide>` · cuerpo central (`<Face>` + `<Chest>`, fondo `#58b09a` redondeado) · `<RightSide>`.
+- `src/bmo/structure.jsx` — layout raíz: fila flex de tres columnas `<LeftSide>` (w-1/4) · cuerpo central (w-2/5, fondo `#58b09a`, contiene `<Face>` + `<Chest>`) · `<RightSide>` (w-1/4).
 
 Las partes viven bajo `src/bmo/parts/`, agrupadas por zona:
 
-- `face/` — `face.jsx` compone `eyes.jsx` y `mouth.jsx`.
-- `chest/` — `chest.jsx` compone `diskette.jsx`, `left-buttons/` (`d-pad.jsx`, `select-start-buttons.jsx`) y `right-buttons/` (`action-buttons.jsx`).
-- `sides/` — `left-side.jsx` y `right-side.jsx`, más piezas compartidas `letters.jsx` y `speaker.jsx`.
+- `face/` — `face.jsx` (panel `#cefeda`, `h-[50vh]`) compone `eyes.jsx` y `mouth.jsx`.
+- `chest/` — `chest.jsx` (`h-[40vh]`) compone `diskette.jsx` y dos mitades: `left-buttons/left-buttons.jsx` (agrupa `d-pad.jsx` + `select-start-buttons.jsx`) y `right-buttons/right-buttons.jsx` (agrupa `action-buttons.jsx`).
+- `sides/` — `left-side/left-side.jsx` y `right-side/right-side.jsx`, que componen las piezas compartidas `sides/speaker.jsx` (rejilla de altavoz) y `sides/letters.jsx` (texto "BMO" rotado).
 
-Toda la apariencia (formas, colores, posiciones) se define con clases de Tailwind en el JSX. Para modificar a BMO, se edita el componente de la parte correspondiente; no hay CSS propio más allá de `src/index.css`.
+Puntos no evidentes al leer un solo archivo:
 
-### Notas
-
-- La fuente `src/SocialScienceSans.otf` está en el repo como recurso; verificar dónde se referencia antes de asumir que está cargada.
-- Tailwind escanea `index.html` y `src/**/*.{js,ts,jsx,tsx}` (ver `tailwind.config.js`); el tema no está extendido, se usan utilidades y valores arbitrarios (`bg-[#58b09a]`).
-
-## Estructura del repo
-
-```
-bmo/
-├── index.html              # HTML raíz (monta /src/main.jsx)
-├── package.json            # scripts y dependencias
-├── vite.config.js          # Vite + plugin React
-├── tailwind.config.js      # config de Tailwind
-├── postcss.config.js       # PostCSS (tailwindcss + autoprefixer)
-├── .eslintrc.cjs           # reglas de ESLint
-├── public/                 # assets estáticos (vite.svg)
-└── src/
-    ├── main.jsx            # entry point
-    ├── App.jsx             # raíz de la app
-    ├── index.css           # directivas de Tailwind
-    ├── SocialScienceSans.otf
-    ├── assets/
-    └── bmo/
-        ├── structure.jsx   # layout general
-        └── parts/          # cara, pecho, botones y laterales
-```
+- **Los dos laterales son copias idénticas**: `right-side.jsx` tiene el mismo JSX que `left-side.jsx` (e incluso exporta una función llamada `LeftSide`). Un cambio en un lateral normalmente hay que replicarlo en el otro.
+- **Las proporciones dependen del alto del viewport**: `structure.jsx` usa `h-screen`, la cara `h-[50vh]` y el pecho `h-[40vh]`; el ancho se reparte con fracciones (`w-1/4`, `w-2/5`). Cambiar una de estas medidas desplaza el resto del cuerpo.
+- **Fuente `Social Science Sans`**: se registra con `@font-face` en `src/index.css` (apunta a `src/SocialScienceSans.otf`) y solo se usa en `sides/letters.jsx` mediante `style={{ fontFamily: ... }}` inline, no con una clase de Tailwind. Si se quiere como utilidad (`font-...`), hay que extender `theme.fontFamily` en `tailwind.config.js`.
+- **`src/index.css` no son solo directivas de Tailwind**: además define estilos globales en `:root` (fondo `#242424`, tipografía Inter/system-ui, `color-scheme: light dark`). Es el único CSS propio del proyecto; todo lo demás son clases de Tailwind en el JSX, con valores arbitrarios para los colores (`bg-[#58b09a]`, `bg-[#509284]`, `bg-[#cefeda]`). El tema de Tailwind no está extendido.
